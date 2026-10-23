@@ -689,7 +689,7 @@
     <script>
         /* =====================  PENGATURAN (EDIT DI SINI)  ===================== */
         // URL Web App dari Google Apps Script (berakhiran /exec). Hanya dipakai untuk MEMBACA data.
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxtEfa4SokLYmluTkU0tOQRsdpf6ZPfeDr5bNaexKUnj8V6zRlACpvF7pMhgpCUGaDF/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbyWjDxt0ZnAaONoFCPB7X88e5OS4zFb7qjmfUV8fT3fo14vg0gdnGi4e2TISr5fcgty/exec';
         // Gambar latar polos (logo & footer), taruh di folder yang sama dengan index.html
         const BG_URL = 'background.png';
         /* ======================================================================= */
@@ -703,6 +703,7 @@
         if (window.self !== window.top) document.documentElement.classList.add('in-frame');
 
         let appConfig = { ...DEFAULT_CONFIG };
+        let lastError = '';
         let weddingList = [], dataStatus = 'loading', currentDate = '', currentPage = 1;
         const itemsPerPage = 6;
         const pad = n => String(n).padStart(2, '0');
@@ -729,6 +730,7 @@
             else {
                 try {
                     const j = await (await fetch(API_URL + '?t=' + Date.now())).json();
+                    if (!j || !j.ok) throw new Error('respon tidak valid');
                     weddingList = j.data || [];
                     const cfg = {};
                     Object.keys(j.config || {}).forEach(k => { if (k in DEFAULT_CONFIG && !isNaN(parseFloat(j.config[k]))) cfg[k] = parseFloat(j.config[k]); });
@@ -736,6 +738,7 @@
                     localStorage.setItem(CACHE_KEY, JSON.stringify({ data: weddingList, config: appConfig }));
                     dataStatus = 'live';
                 } catch (e) {
+                    lastError = String((e && e.message) || e);
                     try { const c = JSON.parse(localStorage.getItem(CACHE_KEY)); weddingList = c.data; appConfig = c.config; dataStatus = 'cache'; }
                     catch (e2) { weddingList = []; dataStatus = 'error'; }
                 }
@@ -744,6 +747,11 @@
             if (!currentDate || !weddingList.some(i => i.date === currentDate)) currentDate = pickDefaultDate();
             document.getElementById('direct-date-input').value = currentDate;
             renderWidgetData();
+        }
+
+        function debugHtml() {
+            if (!/[?&]debug/.test(location.search)) return '';
+            return `<br><small style="font-weight:600;color:#475569;word-break:break-all;">API_URL: ${API_URL ? escapeHtml(API_URL.slice(0, 80)) + '...' : '(kosong)'}<br>Error: ${escapeHtml(lastError)}</small>`;
         }
 
         function pickDefaultDate() {
@@ -773,7 +781,7 @@
             document.getElementById('display-date-text').innerText = currentDate ? formatIndoDate(currentDate) : '-';
 
             if (dataStatus === 'loading') { box.innerHTML = '<div class="empty-state">Memuat data...</div>'; return; }
-            if (dataStatus === 'error') { box.innerHTML = '<div class="empty-state">Data belum dapat dimuat. Coba lagi nanti.</div>'; document.getElementById('page-info-text').innerText = '0 dari 0'; return; }
+            if (dataStatus === 'error') { box.innerHTML = '<div class="empty-state">Data belum dapat dimuat. Coba lagi nanti.' + debugHtml() + '</div>'; document.getElementById('page-info-text').innerText = '0 dari 0'; return; }
 
             const filtered = weddingList.filter(i => i.date === currentDate);
             if (!filtered.length) {
